@@ -1,0 +1,932 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bird Migration Monitoring System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.css" />
+    <style>
+        :root {
+            --primary: #1e88e5;
+            --success: #43a047;
+            --warning: #ffa000;
+            --danger: #e53935;
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+            --card-bg: #ffffff;
+            --border-radius: 8px;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo h1 {
+            margin: 0;
+            color: var(--dark);
+            font-size: 24px;
+        }
+        
+        .logo svg {
+            width: 40px;
+            height: 40px;
+            fill: var(--primary);
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .status.alert {
+            background-color: rgba(229, 57, 53, 0.1);
+            color: var(--danger);
+        }
+        
+        .status.normal {
+            background-color: rgba(67, 160, 71, 0.1);
+            color: var(--success);
+            display: none;
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.7);
+            }
+            
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(229, 57, 53, 0);
+            }
+            
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(229, 57, 53, 0);
+            }
+        }
+        
+        .header-actions button {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        
+        .header-actions button:hover {
+            background-color: #1565c0;
+        }
+        
+        .overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .stat-card .metric {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        
+        .stat-card .label {
+            color: #666;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .stat-card .trend {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+        }
+        
+        .trend.up {
+            color: var(--danger);
+        }
+        
+        .trend.down {
+            color: var(--success);
+        }
+        
+        .section-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .section-heading h2 {
+            margin: 0;
+            font-size: 18px;
+            color: var(--dark);
+        }
+        
+        .section-heading .controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .section-heading select {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            background-color: white;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .panel {
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            height: 100%;
+        }
+        
+        .panel h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        #map {
+            height: 400px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+        
+        .alert-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .alert-item {
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            gap: 15px;
+        }
+        
+        .alert-item:last-child {
+            border-bottom: none;
+        }
+        
+        .alert-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .alert-icon.high {
+            background-color: rgba(229, 57, 53, 0.1);
+            color: var(--danger);
+        }
+        
+        .alert-icon.medium {
+            background-color: rgba(255, 160, 0, 0.1);
+            color: var(--warning);
+        }
+        
+        .alert-content {
+            flex-grow: 1;
+        }
+        
+        .alert-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .alert-time {
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .alert-description {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 8px;
+        }
+        
+        .alert-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .alert-actions button {
+            padding: 4px 10px;
+            font-size: 12px;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+        }
+        
+        .btn-acknowledge {
+            background-color: var(--light);
+            color: var(--dark);
+        }
+        
+        .btn-view {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .grid-span-2 {
+            grid-column: span 2;
+        }
+        
+        .sensor-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        .sensor-table th {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 2px solid #eee;
+            color: #666;
+        }
+        
+        .sensor-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .sensor-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .sensor-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-active {
+            background-color: var(--success);
+        }
+        
+        .status-warning {
+            background-color: var(--warning);
+        }
+        
+        .status-error {
+            background-color: var(--danger);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-danger {
+            background-color: rgba(229, 57, 53, 0.1);
+            color: var(--danger);
+        }
+        
+        .badge-warning {
+            background-color: rgba(255, 160, 0, 0.1);
+            color: var(--warning);
+        }
+        
+        .badge-success {
+            background-color: rgba(67, 160, 71, 0.1);
+            color: var(--success);
+        }
+        
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .footer-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .grid-span-2 {
+                grid-column: span 1;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .overview {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .header-actions {
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 10px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .overview {
+                grid-template-columns: 1fr;
+            }
+            
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            
+            .header-actions {
+                width: 100%;
+                flex-direction: row;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12,3C16.97,3 21,7.03 21,12C21,16.97 16.97,21 12,21C7.03,21 3,16.97 3,12C3,7.03 7.03,3 12,3M12,5C8.14,5 5,8.14 5,12C5,15.86 8.14,19 12,19C15.86,19 19,15.86 19,12C19,8.14 15.86,5 12,5M16,12V10H8V12H10V15H12V12H16Z"/>
+                </svg>
+                <h1>Bird Migration Monitoring System</h1>
+            </div>
+            <div class="header-actions">
+                <div class="status alert pulse">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM12 20C16.418 20 20 16.418 20 12C20 7.582 16.418 4 12 4C7.582 4 4 7.582 4 12C4 16.418 7.582 20 12 20ZM11 15H13V17H11V15ZM11 7H13V13H11V7Z" fill="currentColor"/>
+                    </svg>
+                    Active Alert
+                </div>
+                <div class="status normal">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM12 20C16.418 20 20 16.418 20 12C20 7.582 16.418 4 12 4C7.582 4 4 7.582 4 12C4 16.418 7.582 20 12 20ZM10 14.5L16 8.5L14.5 7L10 11.5L7.5 9L6 10.5L10 14.5Z" fill="currentColor"/>
+                    </svg>
+                    All Systems Normal
+                </div>
+                <button>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM11 11V17H13V11H11ZM11 7V9H13V7H11Z" fill="white"/>
+                    </svg>
+                    Dispatch Response Team
+                </button>
+            </div>
+        </header>
+        
+        <div class="overview">
+            <div class="stat-card">
+                <div class="label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 19H20V12H22V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V12H4V19ZM13 9H11V16H13V9ZM16 4H8V15H16V4ZM7 16H17C17.5523 16 18 15.5523 18 15V4C18 3.44772 17.5523 3 17 3H7C6.44772 3 6 3.44772 6 4V15C6 15.5523 6.44772 16 7 16Z" fill="#666"/>
+                    </svg>
+                    Prediction Error
+                </div>
+                <div class="metric">66.42</div>
+                <div class="trend up">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13 7.82843V20H11V7.82843L5.63604 13.1924L4.22183 11.7782L12 4L19.7782 11.7782L18.364 13.1924L13 7.82843Z" fill="currentColor"/>
+                    </svg>
+                    345% above normal
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 14.5C13.3807 14.5 14.5 13.3807 14.5 12C14.5 10.6193 13.3807 9.5 12 9.5C10.6193 9.5 9.5 10.6193 9.5 12C9.5 13.3807 10.6193 14.5 12 14.5ZM12 16.5C9.51472 16.5 7.5 14.4853 7.5 12C7.5 9.51472 9.51472 7.5 12 7.5C14.4853 7.5 16.5 9.51472 16.5 12C16.5 14.4853 14.4853 16.5 12 16.5ZM8.5 5C8.5 5.82843 7.82843 6.5 7 6.5C6.17157 6.5 5.5 5.82843 5.5 5C5.5 4.17157 6.17157 3.5 7 3.5C7.82843 3.5 8.5 4.17157 8.5 5ZM21.5 5C21.5 5.82843 20.8284 6.5 20 6.5C19.1716 6.5 18.5 5.82843 18.5 5C18.5 4.17157 19.1716 3.5 20 3.5C20.8284 3.5 21.5 4.17157 21.5 5ZM8.5 19C8.5 19.8284 7.82843 20.5 7 20.5C6.17157 20.5 5.5 19.8284 5.5 19C5.5 18.1716 6.17157 17.5 7 17.5C7.82843 17.5 8.5 18.1716 8.5 19ZM21.5 19C21.5 19.8284 20.8284 20.5 20 20.5C19.1716 20.5 18.5 19.8284 18.5 19C18.5 18.1716 19.1716 17.5 20 17.5C20.8284 17.5 21.5 18.1716 21.5 19ZM16.5 15.9706V14.8C19.5 14 21.5 13 21.5 12C21.5 11 19.5 10 16.5 9.2V8.02944C20.5 9.22944 23.5 10.8 23.5 12C23.5 13.2 20.5 14.7706 16.5 15.9706ZM2.5 12C2.5 13 4.5 14 7.5 14.8V15.9706C3.5 14.7706 0.5 13.2 0.5 12C0.5 10.8 3.5 9.22944 7.5 8.02944V9.2C4.5 10 2.5 11 2.5 12Z" fill="#666"/>
+                    </svg>
+                    Temperature
+                </div>
+                <div class="metric">32.4°C</div>
+                <div class="trend up">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13 7.82843V20H11V7.82843L5.63604 13.1924L4.22183 11.7782L12 4L19.7782 11.7782L18.364 13.1924L13 7.82843Z" fill="currentColor"/>
+                    </svg>
+                    5.2°C above average
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 3.1L7.05 8.05C6.07111 9.029 5.40449 10.2763 5.13445 11.6341C4.86441 12.992 5.00308 14.3994 5.53291 15.6784C6.06274 16.9575 6.95996 18.0507 8.11109 18.8198C9.26222 19.589 10.6156 20.0012 12.0005 20.0012C13.3854 20.0012 14.7388 19.589 15.8899 18.8198C17.0411 18.0507 17.9383 16.9575 18.4681 15.6784C18.9979 14.3994 19.1366 12.992 18.8666 11.6341C18.5965 10.2763 17.9299 9.029 16.951 8.05L12 3.1ZM12 0.272L18.364 6.636C19.6227 7.89468 20.4798 9.49833 20.8271 11.2354C21.1743 12.9725 21.0039 14.7665 20.3394 16.4088C19.6749 18.051 18.5467 19.4714 17.0903 20.486C15.6339 21.5005 13.9147 22.0687 12.1591 22.1204C10.4034 22.172 8.65912 21.7048 7.14619 20.7863C5.63325 19.8678 4.42591 18.5385 3.66465 16.9459C2.90338 15.3533 2.61774 13.5727 2.84483 11.8177C3.07191 10.0628 3.80215 8.4073 4.95 7.05L12 0Z" fill="#666"/>
+                    </svg>
+                    Humidity
+                </div>
+                <div class="metric">18.7%</div>
+                <div class="trend down">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13 16.1716V4H11V16.1716L5.63604 10.8076L4.22183 12.2218L12 20L19.7782 12.2218L18.364 10.8076L13 16.1716Z" fill="currentColor"/>
+                    </svg>
+                    23.5% below normal
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20.8944 19.4499C20.725 19.5563 20.5385 19.6323 20.343 19.6739C20.1475 19.7155 19.9464 19.7221 19.7486 19.6935C19.5508 19.6648 19.3599 19.6015 19.1841 19.5068C19.0083 19.412 18.8503 19.2878 18.7184 19.1399L14.9999 15L13.9999 17L7.99992 11L9.99992 10L5.85992 6.28994C5.71207 6.15799 5.5879 5.99989 5.49316 5.82413C5.39841 5.64837 5.33513 5.45746 5.30649 5.25963C5.27785 5.0618 5.28433 4.85978 5.32561 4.6643C5.36689 4.46883 5.44222 4.28341 5.54792 4.11994C6.33992 2.94994 7.39492 2.05994 8.67992 1.49994C9.96492 0.939938 11.3599 0.789938 12.7619 1.09994C14.1639 1.38994 15.4229 2.09994 16.3649 3.10994C17.3069 4.11994 17.8819 5.37994 17.9999 6.69994H19.9999C19.9999 6.82994 20.0399 6.94994 20.0799 7.06994C20.4529 8.63742 20.3387 10.2907 19.7528 11.7836C19.167 13.2766 18.1396 14.5341 16.8178 15.3597C15.496 16.1853 13.944 16.5364 12.3936 16.3599C10.8432 16.1834 9.38358 15.4897 8.23992 14.3799L14.2399 20.3799C14.3877 20.5119 14.5119 20.6698 14.6067 20.8457C14.7014 21.0215 14.7648 21.2124 14.7934 21.4102C14.822 21.608 14.8154 21.8091 14.7738 22.0046C14.7322 22.2001 14.6562 22.3865 14.5499 22.5559C14.1454 23.0893 13.5415 23.4072 12.8944 23.4072C12.2472 23.4072 11.6433 23.0893 11.2388 22.5559L2.44992 13.7799C1.91643 13.3755 1.59848 12.7716 1.59848 12.1244C1.59848 11.4773 1.91643 10.8734 2.44992 10.4689C2.61928 10.3626 2.8057 10.2866 3.00117 10.245C3.19664 10.2034 3.39789 10.1968 3.59566 10.2254C3.79343 10.254 3.98434 10.3173 4.1602 10.4121C4.33605 10.5068 4.49408 10.631 4.62592 10.7789L8.34392 14.4999L9.34392 12.4999L15.3439 18.4999L14.3439 19.4999L18.0539 23.1399C18.1859 23.2878 18.3439 23.412 18.5197 23.5068C18.6956 23.6015 18.8865 23.6648 19.0842 23.6935C19.282 23.7221 19.4831 23.7155 19.6786 23.6739C19.8741 23.6323 20.0605 23.5563 20.2299 23.4499C20.435 23.3069 20.6046 23.1232 20.7283 22.9111C20.8519 22.699 20.9267 22.4638 20.9476 22.2199C20.9685 21.976 20.935 21.7307 20.8493 21.5015C20.7637 21.2723 20.6281 21.0651 20.4529 20.8962C20.2776 20.7273 20.067 20.6006 19.8366 20.5251C19.6061 20.4496 19.3619 20.427 19.1211 20.4588C18.8803 20.4906 18.6504 20.5758 18.4451 20.7085C18.2398 20.8412 18.0651 21.0182 17.9329 21.2269C17.8007 21.4356 17.7142 21.671 17.6775 21.9199C17.6409 22.1688 17.6549 22.4229 17.7185 22.6651L17.9999 22.9999L15.9999 22.9999L11.9999 18.9999L7.99992 22.9999L5.99992 22.9999L12.9999 15.9999L11.9999 14.9999L13.2399 13.7599C13.0757 13.0431 13.0717 12.2997 13.2283 11.5811C13.3848 10.8626 13.6978 10.1893 14.1462 9.61576C14.5946 9.04223 15.1665 8.57923 15.8166 8.25955C16.4667 7.93987 17.179 7.77208 17.8999 7.76994H19.9999V5.76994C18.8144 5.67231 17.6745 5.25528 16.706 4.57112C15.7376 3.88695 14.9796 2.96132 14.5148 1.89599C15.5444 2.05305 16.5296 2.4238 17.3997 2.9844C18.2699 3.54499 19.0034 4.28275 19.5499 5.14994C19.7081 5.35927 19.8318 5.59399 19.9161 5.84394C20.0005 6.09389 20.0443 6.35556 20.0454 6.61916C20.0466 6.88276 20.0051 7.14491 19.9229 7.39573C19.8407 7.64654 19.7189 7.88251 19.5624 8.09341C19.4059 8.30431 19.217 8.48773 19.0048 8.63463C18.7926 8.78153 18.5599 8.88938 18.3154 8.95338C18.0709 9.01738 17.818 9.03648 17.5678 9.00991C17.3176 8.98333 17.0738 8.91148 16.8489 8.79797L16.4999 8.99994L17.4999 9.99994L10.4999 16.9999L8.49992 14.9999L13.4999 9.99994L12.4999 8.99994L14.9999 6.49994C14.6184 5.2528 13.8811 4.14342 12.8875 3.3143C11.894 2.48519 10.6922 1.97079 9.41788 1.83894C8.14359 1.70708 6.86358 1.96325 5.7359 2.57447C4.60823 3.18568 3.68479 4.12426 3.09038 5.2609C2.49597 6.39755 2.25744 7.68169 2.40721 8.95444C2.55698 10.2272 3.0876 11.4208 3.92995 12.4006C4.7723 13.3805 5.88942 14.1 7.13839 14.4617C8.38736 14.8234 9.71368 14.811 10.9549 14.4259L11.9999 15.9999L4.99992 22.9999L2.99992 22.9999L6.32992 19.6699C4.91658 18.7476 3.80861 17.4717 3.11826 15.9816C2.42791 14.4914 2.18222 12.8425 2.41008 11.2236C2.63794 9.60459 3.33087 8.08418 4.40115 6.84902C5.47143 5.61386 6.87547 4.71356 8.44992 4.26994V4.26994C9.60719 3.94639 10.8246 3.89564 12.0056 4.12175C13.1866 4.34785 14.3005 4.84502 15.259 5.5737C16.2174 6.30238 16.9908 7.24274 17.519 8.31747C18.0473 9.3922 18.3166 10.5712 18.3063 11.7646C18.296 12.958 18.0064 14.1322 17.4601 15.1979C16.9138 16.2636 16.1246 17.1911 15.1536 17.9038C14.1825 18.6166 13.0597 19.0953 11.8742 19.3015C10.6886 19.5077 9.47104 19.4364 8.31992 19.0929L2.99992 24.4099L1.58992 22.9999L20.8944 3.69994C21.0007 3.53058 21.0767 3.34416 21.1183 3.14869C21.1599 2.95322 21.1665 2.75197 21.1379 2.5542C21.1093 2.35643 21.046 2.16552 20.9513 1.98966C20.8565 1.81381 20.7323 1.65578 20.5844 1.52394C20.4365 1.3921 20.2785 1.28771 20.1026 1.21295C19.9268 1.13819 19.7359 1.0949 19.5381 1.08631C19.3403 1.07773 19.1391 1.10405 18.9436 1.16456C18.7481 1.22507 18.5617 1.32016 18.3924 1.44244C18.223 1.56472 18.0789 1.71545 17.9671 1.88744C17.8552 2.05943 17.7776 2.24981 17.7383 2.44913C17.699 2.64845 17.6988 2.85315 17.7378 3.05254C17.7768 3.25193 17.854 3.44247 17.9655 3.61466L17.9999 3.76994L15.9999 3.76994L4.37492 15.3949C3.50576 14.5463 2.86187 13.5015 2.50264 12.3516C2.14341 11.2018 2.08136 9.98487 2.32188 8.80602C2.5624 7.62717 3.09786 6.52544 3.8754 5.5981C4.65295 4.67076 5.647 3.94591 6.76687 3.48985C7.88673 3.0338 9.09447 2.86043 10.2925 2.98565C11.4905 3.11087 12.638 3.53061 13.631 4.20401C14.624 4.87741 15.4308 5.7825 15.9748 6.83987C16.5188 7.89725 16.7815 9.07238 16.7389 10.2549L20.9999 5.99994L20.9999 7.99994L17.9999 7.99994C17.2836 7.99994 16.5803 8.17585 15.948 8.50873C15.3158 8.84162 14.7741 9.32229 14.3653 9.90993L14.9999 10.9999L21.9999 3.99994L23.4099 5.40994L4.10492 24.7049C3.96776 24.8421 3.80565 24.9481 3.62876 25.0154C3.45188 25.0826 3.26346 25.1098 3.07492 25.0949C2.88638 25.08 2.70398 25.0234 2.53992 24.9289C2.37586 24.8343 2.23397 24.7042 2.12492 24.5479C1.87407 24.1965 1.77495 23.7541 1.85327 23.3263C1.93159 22.8984 2.17992 22.5215 2.54492 22.2849L20.9999 3.82994V1.82994L19.9999 1.82994L2.54492 19.2849C1.99057 19.6894 1.60538 20.2669 1.46048 20.9209C1.31558 21.5749 1.41989 22.2577 1.75742 22.8474C2.09494 23.4371 2.64344 23.8972 3.30027 24.1433C3.9571 24.3894 4.6824 24.4056 5.34992 24.1889C5.68474 24.0813 5.99575 23.9153 6.26511 23.6992C6.53447 23.4831 6.75643 23.2208 6.91742 22.9269L6.99992 22.7949L8.99992 22.7949L11.9999 19.7949L14.9999 22.7949L16.9999 22.7949L14.0499 19.8499C14.8954 19.6211 15.6825 19.2218 16.3585 18.6771C17.0345 18.1324 17.5829 17.4552 17.9649 16.6899L17.9999 16.5999V18.5999L18.0599 18.6599C18.4151 19.0061 18.6241 19.4711 18.642 19.9611C18.66 20.451 18.4856 20.9308 18.1549 21.2999C17.8243 21.6691 17.3653 21.9018 16.8766 21.9513C16.388 22.0008 15.8966 21.8637 15.4999 21.5699L2.99992 9.06994C2.7757 8.84573 2.60239 8.58157 2.48942 8.29135C2.37645 8.00112 2.3259 7.69188 2.34086 7.38284C2.35582 7.0738 2.43591 6.7708 2.57582 6.49286C2.71572 6.21493 2.91243 5.96832 3.15492 5.76994C3.63074 5.42437 4.22077 5.24991 4.81992 5.27994C5.41907 5.30997 5.98746 5.54178 6.42492 5.93994L19.9999 19.5149V21.5149L17.9999 21.5149L14.9999 18.5149L20.9999 12.5149L22.4099 13.9249L18.0599 18.2749C18.4151 15.9849 17.9649 16.6899 17.9649 16.6899L20.8944 19.4499Z" fill="#666"/>
+                    </svg>
+                    Birds in Area
+                </div>
+                <div class="metric">76</div>
+                <div class="trend down">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13 16.1716V4H11V16.1716L5.63604 10.8076L4.22183 12.2218L12 20L19.7782 12.2218L18.364 10.8076L13 16.1716Z" fill="currentColor"/>
+                    </svg>
+                    42% decrease from baseline
+                </div>
+            </div>
+        </div>
+        
+        <div class="dashboard-grid">
+            <div class="panel">
+                <div class="section-heading">
+                    <h3>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M17.5 12C17.5 13.576 16.8415 15.0879 15.6694 16.2599C14.4973 17.432 12.985 18.0905 11.409 18.0905C9.83296 18.0905 8.32067 17.432 7.14859 16.2599C5.97651 15.0879 5.31802 13.576 5.31802 12C5.31802 10.424 5.97651 8.91171 7.14859 7.73963C8.32067 6.56755 9.83296 5.90906 11.409 5.90906C12.985 5.90906 14.4973 6.56755 15.6694 7.73963C16.8415 8.91171 17.5 10.424 17.5 12ZM11.409 9.54452C10.2079 9.54452 9.22348 10.5275 9.22348 11.73C9.22348 12.9326 10.2079 13.9155 11.409 13.9155C12.6101 13.9155 13.5945 12.9326 13.5945 11.73C13.5945 10.5275 12.6101 9.54452 11.409 9.54452ZM20.5596 4.59096C20.5596 5.58492 19.7535 6.39096 18.7596 6.39096C17.7656 6.39096 16.9596 5.58492 16.9596 4.59096C16.9596 3.597 17.7656 2.79096 18.7596 2.79096C19.7535 2.79096 20.5596 3.597 20.5596 4.59096ZM21.7596 6.39096C21.7596 7.38492 20.9535 8.19096 19.9596 8.19096C18.9656 8.19096 18.1596 7.38492 18.1596 6.39096C18.1596 5.397 18.9656 4.59096 19.9596 4.59096C20.9535 4.59096 21.7596 5.397 21.7596 6.39096ZM20.5596 8.19096C21.5535 8.19096 22.3596 9.00246 22.3596 10.0005V17.9005C22.3596 18.8985 21.5535 19.71 20.5596 19.71H4.33939C3.34543 19.71 2.53939 18.8985 2.53939 17.9005V5.99096C2.53939 4.993 3.34543 4.18146 4.33939 4.18146H15.1596C15.1596 5.17542 14.3535 5.98146 13.3596 5.98146H4.93939V17.91H19.9596V9.99096C19.9596 9.00246 20.7656 8.19096 21.7596 8.19096H20.5596Z" fill="currentColor"/>
+                        </svg>
+                        Migration Map
+                    </h3>
+                    <div class="controls">
+                        <select id="timeRange">
+                            <option value="24h">Last 24 hours</option>
+                            <option value="7d" selected>Last 7 days</option>
+                            <option value="30d">Last 30 days</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="map"></div>
+                <div class="section-heading">
+                    <h3>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 17H13V19H3V17ZM3 12H21V14H3V12ZM3 7H21V9H3V7Z" fill="currentColor"/>
+                        </svg>
+                        Environmental Trends
+                    </h3>
+                    <div class="controls">
+                        <select id="dataType">
+                            <option value="temperature" selected>Temperature</option>
+                            <option value="humidity">Humidity</option>
+                            <option value="error">Prediction Error</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="trendsChart"></canvas>
+                </div>
+            </div>
+            <div class="panel">
+                <h3>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM12 20C16.418 20 20 16.418 20 12C20 7.582 16.418 4 12 4C7.582 4 4 7.582 4 12C4 16.418 7.582 20 12 20ZM11 15H13V17H11V15ZM11 7H13V13H11V7Z" fill="currentColor"/>
+                    </svg>
+                    Recent Alerts
+                </h3>
+                <ul class="alert-list">
+                    <li class="alert-item">
+                        <div class="alert-icon high">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM11 15V17H13V15H11ZM11 7V13H13V7H11Z" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <div class="alert-content">
+                            <div class="alert-title">
+                                Critical Migration Pattern Deviation
+                                <span class="alert-time">Just now</span>
+                            </div>
+                            <div class="alert-description">
+                                Prediction error: 66.42 - Birds are significantly off their expected migration path.
+                            </div>
+                            <div class="alert-actions">
+                                <button class="btn-acknowledge">Acknowledge</button>
+                                <button class="btn-view">View Details</button>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="alert-item">
+                        <div class="alert-icon high">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM11 15V17H13V15H11ZM11 7V13H13V7H11Z" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <div class="alert-content">
+                            <div class="alert-title">
+                                High Temperature Warning
+                                <span class="alert-time">30 min ago</span>
+                            </div>
+                            <div class="alert-description">
+                                Temperature reached 32.4°C, which is 5.2°C above seasonal average.
+                            </div>
+                            <div class="alert-actions">
+                                <button class="btn-acknowledge">Acknowledge</button>
+                                <button class="btn-view">View Details</button>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="alert-item">
+                        <div class="alert-icon medium">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM11 15V17H13V15H11ZM11 7V13H13V7H11Z" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <div class="alert-content">
+                            <div class="alert-title">
+                                Low Humidity Alert
+                                <span class="alert-time">2 hours ago</span>
+                            </div>
+                            <div class="alert-description">
+                                Humidity dropped to 18.7%, which is 23.5% below normal range.
+                            </div>
+                            <div class="alert-actions">
+                                <button class="btn-acknowledge">Acknowledge</button>
+                                <button class="btn-view">View Details</button>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="alert-item">
+                        <div class="alert-icon medium">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22ZM11 15V17H13V15H11ZM11 7V13H13V7H11Z" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <div class="alert-content">
+                            <div class="alert-title">
+                                Population Decline Detected
+                                <span class="alert-time">Yesterday</span>
+                            </div>
+                            <div class="alert-description">
+                                Bird count has decreased by 42% compared to baseline measurements.
+                            </div>
+                            <div class="alert-actions">
+                                <button class="btn-acknowledge">Acknowledge</button>
+                                <button class="btn-view">View Details</button>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <div class="panel grid-span-2">
+                <div class="section-heading">
+                    <h3>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M13 21V23H11V21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H13ZM11 17.938C11.3235 17.9771 11.6568 18 12 18C14.2091 18 16 16.2091 16 14C16 11.7909 14.2091 10 12 10C9.79086 10 8 11.7909 8 14C8 14.3432 8.02294 14.6765 8.06189 15H11V17.938ZM4 5V19H7.10002C7.03749 18.6794 7 18.3431 7 18V14C7 11.2386 9.23858 9 12 9C14.7614 9 17 11.2386 17 14C17 16.7614 14.7614 19 12 19C11.6569 19 11.3206 18.9625 11 18.9V17H10C7.64442 17 6.31435 15.7742 5.1966 14.3501C5.13581 14.2684 5.07572 14.1868 5.01651 14.1057L4 15.1121V19H20V5H4Z" fill="currentColor"/>
+                        </svg>
+                        Sensor Network Status
+                    </h3>
+                </div>
+                <table class="sensor-table">
+                    <thead>
+                        <tr>
+                            <th>Sensor ID</th>
+                            <th>Location</th>
+                            <th>Last Reading</th>
+                            <th>Battery</th>
+                            <th>Signal</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>SN-001</td>
+                            <td>33.8765, -118.3456</td>
+                            <td>Today, 10:25 AM</td>
+                            <td>87%</td>
+                            <td>Strong</td>
+                            <td><span class="sensor-status status-active"></span> Active</td>
+                        </tr>
+                        <tr>
+                            <td>SN-002</td>
+                            <td>33.8943, -118.3621</td>
+                            <td>Today, 10:22 AM</td>
+                            <td>92%</td>
+                            <td>Strong</td>
+                            <td><span class="sensor-status status-active"></span> Active</td>
+                        </tr>
+                        <tr>
+                            <td>SN-003</td>
+                            <td>33.9012, -118.3712</td>
+                            <td>Today, 10:18 AM</td>
+                            <td>21%</td>
+                            <td>Weak</td>
+                            <td><span class="sensor-status status-warning"></span> Low Battery</td>
+                        </tr>
+                        <tr>
+                            <td>SN-004</td>
+                            <td>33.9154, -118.3823</td>
+                            <td>Yesterday, 4:12 PM</td>
+                            <td>Unknown</td>
+                            <td>None</td>
+                            <td><span class="sensor-status status-error"></span> Offline</td>
+                        </tr>
+                        <tr>
+                            <td>SN-005</td>
+                            <td>33.8621, -118.3512</td>
+                            <td>Today, 10:24 AM</td>
+                            <td>78%</td>
+                            <td>Strong</td>
+                            <td><span class="sensor-status status-active"></span> Active</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <footer class="footer">
+            <div>© 2025 Bird Migration Monitoring System. Last updated: May 6, 2025 10:30 AM</div>
+            <div class="footer-links">
+                <a href="#">Documentation</a>
+                <a href="#">Support</a>
+                <a href="#">Privacy Policy</a>
+            </div>
+        </footer>
+    </div>
+    
+    <script>
+        // Initialize Map
+        const map = L.map('map').setView([33.8765, -118.3456], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Add bird migration path
+        const migrationPath = [
+            [33.8765, -118.3456],
+            [33.8843, -118.3511],
+            [33.8943, -118.3621],
+            [33.9012, -118.3712],
+            [33.9082, -118.3789],
+            [33.9154, -118.3823]
+        ];
+        
+        const expectedPath = [
+            [33.8765, -118.3456],
+            [33.8843, -118.3511],
+            [33.8921, -118.3566],
+            [33.8999, -118.3621],
+            [33.9077, -118.3676],
+            [33.9155, -118.3731]
+        ];
+        
+        L.polyline(migrationPath, {color: 'red', weight: 4}).addTo(map)
+            .bindPopup('Actual Migration Path');
+        L.polyline(expectedPath, {color: 'blue', weight: 4, dashArray: '8, 8'}).addTo(map)
+            .bindPopup('Expected Migration Path');
+            
+        // Add markers for current and expected positions
+        L.marker([33.9154, -118.3823]).addTo(map)
+            .bindPopup('Current Position')
+            .openPopup();
+        L.marker([33.9155, -118.3731], {opacity: 0.6}).addTo(map)
+            .bindPopup('Expected Position');
+            
+        // Add deviation area
+        L.circle([33.9155, -118.3731], {
+            color: 'orange',
+            fillColor: '#f03',
+            fillOpacity: 0.2,
+            radius: 500
+        }).addTo(map).bindPopup('Deviation Area');
+        
+        // Initialize Charts
+        const ctx = document.getElementById('trendsChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['May 1', 'May 2', 'May 3', 'May 4', 'May 5', 'May 6'],
+                datasets: [
+                    {
+                        label: 'Temperature (°C)',
+                        data: [28.3, 29.1, 30.5, 31.2, 31.8, 32.4],
+                        borderColor: '#e53935',
+                        backgroundColor: 'rgba(229, 57, 53, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Historical Average',
+                        data: [27.1, 27.3, 27.6, 27.9, 28.2, 28.5],
+                        borderColor: '#666',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)'
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        });
+
+        // Handle data type selection changes
+        document.getElementById('dataType').addEventListener('change', function() {
+            const selectedType = this.value;
+            
+            switch(selectedType) {
+                case 'temperature':
+                    chart.data.datasets[0].label = 'Temperature (°C)';
+                    chart.data.datasets[0].data = [28.3, 29.1, 30.5, 31.2, 31.8, 32.4];
+                    chart.data.datasets[1].data = [27.1, 27.3, 27.6, 27.9, 28.2, 28.5];
+                    chart.options.scales.y.title.text = 'Temperature (°C)';
+                    break;
+                case 'humidity':
+                    chart.data.datasets[0].label = 'Humidity (%)';
+                    chart.data.datasets[0].data = [32.5, 30.8, 28.3, 25.6, 22.1, 18.7];
+                    chart.data.datasets[1].data = [42.1, 41.8, 41.5, 41.2, 40.9, 40.6];
+                    chart.options.scales.y.title.text = 'Humidity (%)';
+                    break;
+                case 'error':
+                    chart.data.datasets[0].label = 'Prediction Error';
+                    chart.data.datasets[0].data = [12.3, 18.7, 24.5, 35.2, 48.6, 66.4];
+                    chart.data.datasets[1].data = [8.2, 8.1, 8.3, 8.5, 8.7, 8.9];
+                    chart.options.scales.y.title.text = 'Prediction Error';
+                    break;
+            }
+            
+            chart.update();
+        });
+
+        // Handle time range selection for map
+        document.getElementById('timeRange').addEventListener('change', function() {
+            // In a real application, this would fetch new data based on time range
+            alert(`Time range changed to ${this.value}. In a real application, this would update the map data.`);
+        });
+
+        // Alert acknowledgment functionality
+        document.querySelectorAll('.btn-acknowledge').forEach(button => {
+            button.addEventListener('click', function() {
+                const alertItem = this.closest('.alert-item');
+                alertItem.style.opacity = '0.6';
+                alertItem.querySelector('.alert-description').textContent += ' (Acknowledged)';
+                
+                // Check if all alerts are acknowledged
+                const allAlerts = document.querySelectorAll('.alert-item');
+                const allAcknowledged = Array.from(allAlerts).every(item => 
+                    item.querySelector('.alert-description').textContent.includes('Acknowledged'));
+                
+                if (allAcknowledged) {
+                    document.querySelector('.status.alert').classList.remove('pulse');
+                    document.querySelector('.status.alert').style.display = 'none';
+                    document.querySelector('.status.normal').style.display = 'flex';
+                }
+            });
+        });
+
+        // Dispatch team button functionality
+        document.querySelector('.header-actions button').addEventListener('click', function() {
+            alert('Response team has been dispatched to investigate the migration deviation.');
+        });
+
+        // Simulate real-time updates (demo only)
+        setInterval(() => {
+            // Update temperature with small random fluctuation
+            const tempCard = document.querySelector('.stat-card:nth-child(2) .metric');
+            const currentTemp = parseFloat(tempCard.textContent);
+            const newTemp = (currentTemp + (Math.random() * 0.4 - 0.2)).toFixed(1);
+            tempCard.textContent = `${newTemp}°C`;
+            
+            // Update bird count with small random fluctuation
+            const birdCard = document.querySelector('.stat-card:nth-child(4) .metric');
+            const currentBirds = parseInt(birdCard.textContent);
+            const newBirds = Math.max(0, currentBirds + Math.floor(Math.random() * 3 - 1));
+            birdCard.textContent = newBirds;
+        }, 5000);
+    </script>
+</body>
+</html>
